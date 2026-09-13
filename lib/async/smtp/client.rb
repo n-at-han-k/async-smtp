@@ -180,3 +180,117 @@ module Async
     end
   end
 end
+
+__END__
+
+require "certificate"
+require "session"
+
+# A handler that keeps what it was given and accepts everything.
+collect = lambda do |messages|
+  proc do |message|
+    messages << message
+    Protocol::SMTP::Reply.ok("queued")
+  end
+end
+
+describe "async/smtp/client" do
+  it "sets the session up once and runs each delivery as a transaction on it" do
+    messages = []
+
+    Session.serve(collect.call(messages)) do |client|
+      2.times do |index|
+        client.deliver(from: "me@example.test", to: "you@example.test", body: "Subject: #{index}\r\n\r\n.\r\n")
+      end
+
+      client.extensions.keys.should.include "SIZE"
+    end
+
+    messages.map(&:subject).should == ["0", "1"]
+    # The dot the client stuffed came back off:
+    messages.first.body.should == ".\r\n"
+  end
+
+  it "introduces itself, so the server knows who it is talking to" do
+    messages = []
+
+    Session.serve(collect.call(messages)) do |client|
+      client.deliver(from: "me@example.test", to: "you@example.test", body: "Subject: Hello\r\n\r\nBody.\r\n")
+    end
+
+    messages.first.helo.should == "client.example.test"
+    messages.first.peer.should == "127.0.0.1"
+    messages.first.should.not.be.secure
+  end
+
+  it "raises what the server refused" do
+    messages = []
+
+    Session.serve(collect.call(messages), server_options: {maximum_message_size: 64}) do |client|
+      error = lambda do
+        client.deliver(from: "me@example.test", to: "you@example.test", body: "#{"x" * 200}\r\n")
+      end.should.raise(Protocol::SMTP::ReplyError)
+
+      error.reply.code.should == 552
+
+      # And reads what the server advertised, so a client can give up first:
+      client.connection.maximum_message_size.should == 64
+    end
+
+    messages.should.be.empty
+  end
+
+  it "upgrades the connection with STARTTLS and delivers over it" do
+    messages = []
+    options = {
+      server_options: {ssl_context: Certificate.server_context},
+      client_options: {ssl_context: Certificate.client_context},
+    }
+
+    Session.serve(collect.call(messages), **options) do |client|
+      client.should.be.secure
+
+      reply = client.deliver(
+        from: "me@example.test",
+        to: "you@example.test",
+        body: "Subject: Secret\r\n\r\nBody.\r\n",
+      )
+
+      reply.code.should == 250
+
+      # The extension list is the one from after the upgrade, which no longer
+      # offers STARTTLS:
+      client.extensions.should.not.include "STARTTLS"
+    end
+
+    messages.first.subject.should == "Secret"
+    messages.first.should.be.secure
+  end
+
+  it "carries on in the clear when told not to upgrade" do
+    messages = []
+    options = {
+      server_options: {ssl_context: Certificate.server_context},
+      client_options: {starttls: false},
+    }
+
+    Session.serve(collect.call(messages), **options) do |client|
+      client.should.not.be.secure
+      client.extensions.should.include "STARTTLS"
+      client.deliver(from: "me@example.test", to: "you@example.test", body: "Hi\r\n").code.should == 250
+    end
+
+    messages.first.should.not.be.secure
+  end
+
+  it "closes the socket protocol-smtp would not close itself" do
+    stream = nil
+
+    Session.serve(collect.call([])) do |client|
+      client.deliver(from: "me@example.test", to: "you@example.test", body: "Hi\r\n")
+      stream = client.connection.stream
+    end
+
+    stream.should.be.closed
+  end
+end

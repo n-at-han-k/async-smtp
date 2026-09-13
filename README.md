@@ -110,6 +110,17 @@ No server-side `AUTH`, no connection pool (a pool of stateful transactions is
 not a pool), no queueing or retries. Those belong to the mail system built on
 top, not to the transport.
 
+## Tests
+
+They live in the `__END__` section of the file they test, and run with
+[scampi](https://rubygems.org/gems/scampi). The ones that matter here go over
+a real socket, TLS handshake included:
+
+``` shell
+bin/test                          # everything
+bin/test lib/async/smtp/client.rb # one file
+```
+
 ## License
 
 MIT.

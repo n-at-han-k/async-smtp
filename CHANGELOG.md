@@ -15,3 +15,4 @@
 - `Async::SMTP::Endpoint`: `.for(host, port, secure:)` and
   `.parse("smtps://host")`, which knows the `smtp`, `submission` and `smtps`
   schemes and their ports.
+- Tests live in `__END__` sections and run under `scampi`.

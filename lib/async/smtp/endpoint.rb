@@ -65,3 +65,34 @@ module Async
     end
   end
 end
+
+__END__
+
+describe "async/smtp/endpoint" do
+  it "defaults to the port an MTA listens on, and takes any other" do
+    Async::SMTP::Endpoint.for("mail.example.com").to_s.should.include "25"
+    Async::SMTP::Endpoint.for("mail.example.com", 2525).to_s.should.include "2525"
+  end
+
+  it "wraps the connection in TLS when asked" do
+    endpoint = Async::SMTP::Endpoint.for("mail.example.com", Async::SMTP::Endpoint::SECURE_PORT, secure: true)
+
+    endpoint.should.be.kind_of IO::Endpoint::SSLEndpoint
+    endpoint.hostname.should == "mail.example.com"
+  end
+
+  it "maps each scheme it knows to its port" do
+    Async::SMTP::Endpoint.parse("smtp://mail.example.com").to_s.should.include "25"
+    Async::SMTP::Endpoint.parse("submission://mail.example.com").to_s.should.include "587"
+    Async::SMTP::Endpoint.parse("smtps://mail.example.com").to_s.should.include "465"
+
+    # An explicit port wins:
+    Async::SMTP::Endpoint.parse("smtp://mail.example.com:2525").to_s.should.include "2525"
+  end
+
+  it "only makes smtps secure, because only smtps is encrypted from the first byte" do
+    Async::SMTP::Endpoint.parse("smtps://mail.example.com").should.be.kind_of IO::Endpoint::SSLEndpoint
+    Async::SMTP::Endpoint.parse("smtp://mail.example.com").should.not.be.kind_of IO::Endpoint::SSLEndpoint
+    Async::SMTP::Endpoint.parse("submission://mail.example.com").should.not.be.kind_of IO::Endpoint::SSLEndpoint
+  end
+end

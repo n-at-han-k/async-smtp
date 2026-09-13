@@ -160,3 +160,104 @@ module Async
     end
   end
 end
+
+__END__
+
+require "session"
+
+describe "async/smtp/server" do
+  it "drives the conversation and hands each message to the handler" do
+    messages = []
+    handler = proc {|message| messages << message; Protocol::SMTP::Reply.ok("queued")}
+
+    Session.serve(handler) do |client|
+      reply = client.deliver(
+        from: "me@example.test",
+        to: "you@example.test",
+        body: "Subject: Hello\r\n\r\nBody.\r\n",
+      )
+
+      reply.code.should == 250
+      reply.text.should == "queued"
+    end
+
+    messages.length.should == 1
+    messages.first.from.should == "me@example.test"
+    messages.first.to.should == ["you@example.test"]
+    messages.first.subject.should == "Hello"
+  end
+
+  it "sends a handler's refusal as it stands" do
+    Session.serve(proc {Protocol::SMTP::Reply.rejected("No thanks")}) do |client|
+      error = lambda do
+        client.deliver(from: "me@example.test", to: "you@example.test", body: "Hi\r\n")
+      end.should.raise(Protocol::SMTP::ReplyError)
+
+      error.reply.code.should == 550
+    end
+  end
+
+  it "makes a handler's string the text of a 250" do
+    Session.serve(proc {"queued as 42"}) do |client|
+      reply = client.deliver(from: "me@example.test", to: "you@example.test", body: "Hi\r\n")
+
+      reply.code.should == 250
+      reply.text.should == "queued as 42"
+    end
+  end
+
+  it "answers 451 for a handler that says nothing, because the client may try again" do
+    Session.serve(proc {nil}) do |client|
+      error = lambda do
+        client.deliver(from: "me@example.test", to: "you@example.test", body: "Hi\r\n")
+      end.should.raise(Protocol::SMTP::ReplyError)
+
+      error.reply.code.should == 451
+    end
+  end
+
+  it "keeps the connection when a handler raises, rather than dropping the client" do
+    Session.serve(proc {raise "boom"}) do |client|
+      error = lambda do
+        client.deliver(from: "me@example.test", to: "you@example.test", body: "Hi\r\n")
+      end.should.raise(Protocol::SMTP::ReplyError)
+
+      error.reply.code.should == 451
+
+      # The conversation survived the failure:
+      client.connection.noop.code.should == 250
+    end
+  end
+
+  it "accepts on the endpoint until its task is stopped" do
+    messages = []
+    handler = proc {|message| messages << message; Protocol::SMTP::Reply.ok("queued")}
+
+    Sync do
+      bound = IO::Endpoint.tcp("127.0.0.1", 0).bound
+
+      begin
+        endpoint = bound.local_address_endpoint
+        task = Async::SMTP::Server.for(bound, domain: "mail.example.test", &handler).run
+
+        Async::SMTP::Client.open(endpoint) do |client|
+          body = "Subject: Run\r\n\r\n"
+
+          client.deliver(from: "me@example.test", to: "you@example.test", body: body).code.should == 250
+        end
+      ensure
+        task&.stop
+        bound.close
+      end
+    end
+
+    messages.first.subject.should == "Run"
+  end
+
+  it "describes itself as JSON" do
+    endpoint = Async::SMTP::Endpoint.for("127.0.0.1", 2525)
+    server = Async::SMTP::Server.for(endpoint, domain: "mail.example.test") {nil}
+
+    server.as_json.should == {endpoint: endpoint.to_s, domain: "mail.example.test", secure: false}
+  end
+end

@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/n-at-han-k/protocol-smtp
-  revision: cbd5e9c36a5d9e2af93b7b91bc825894d42bab83
+  revision: c7a4a0f211cb58e6be95cc7394571d936c770101
   specs:
     protocol-smtp (0.1.0)
 
@@ -63,7 +63,7 @@ GEM
       parser (>= 3.3.7.2)
       prism (~> 1.7)
     ruby-progressbar (1.13.0)
-    sus (0.37.2)
+    scampi (1.0.0)
     unicode-display_width (3.2.0)
       unicode-emoji (~> 4.1)
     unicode-emoji (4.2.0)
@@ -78,7 +78,7 @@ DEPENDENCIES
   protocol-smtp!
   rake (~> 13.0)
   rubocop (~> 1.60)
-  sus (~> 0.37)
+  scampi (~> 1.0)
 
 BUNDLED WITH
    2.6.9

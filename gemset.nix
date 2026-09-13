@@ -190,8 +190,8 @@
     platforms = [];
     source = {
       fetchSubmodules = false;
-      rev = "cbd5e9c36a5d9e2af93b7b91bc825894d42bab83";
-      sha256 = "049y60f6mh4yn3d816vmw3ig1lby3l4mxk7qpbmfsb3xcj6qmadl";
+      rev = "c7a4a0f211cb58e6be95cc7394571d936c770101";
+      sha256 = "07ap2ymzlm8snpng5sxadgs5lald4yfs7nl1znk4h8f6civrbcmc";
       type = "git";
       url = "https://github.com/n-at-han-k/protocol-smtp";
     };
@@ -269,15 +269,15 @@
     };
     version = "1.13.0";
   };
-  sus = {
+  scampi = {
     groups = ["development"];
     platforms = [];
     source = {
       remotes = ["https://rubygems.org"];
-      sha256 = "1srglja6vy499dwvcqssqvrlc0igmzkpwba80hxwzb7c6s29aq60";
+      sha256 = "04x366dnw081ajg6qbw24i6afisv7fsgyvvwnvlr000ah48k3d66";
       type = "gem";
     };
-    version = "0.37.2";
+    version = "1.0.0";
   };
   unicode-display_width = {
     dependencies = ["unicode-emoji"];
