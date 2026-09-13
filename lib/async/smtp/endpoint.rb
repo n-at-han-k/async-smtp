@@ -22,9 +22,9 @@ module Async
 
       # The schemes #parse understands, and the port each implies.
       PORTS = {
-        "smtp" => DEFAULT_PORT,
+        "smtp"       => DEFAULT_PORT,
         "submission" => SUBMISSION_PORT,
-        "smtps" => SECURE_PORT,
+        "smtps"      => SECURE_PORT,
       }.freeze
 
       # The schemes that are encrypted before the conversation starts.

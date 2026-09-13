@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "console"
 require "io/endpoint/ssl_endpoint"
 require "io/stream"
 require "protocol/smtp/client"
@@ -106,16 +107,24 @@ module Async
 
       # Say QUIT, if there is anyone to say it to, and close the socket.
       def close
-        @connection&.quit
-        @connection = nil
-        @peer = nil
-      rescue Protocol::SMTP::Error, IOError, SystemCallError
-        # The server hung up before its 221; there is nothing left to say.
+        quit
+
         @connection = nil
         @peer = nil
       end
 
       private
+
+        # Protocol::SMTP::Client#quit closes the stream once the 221 is in, so
+        # the socket is only ours to close when the server did not get that
+        # far.
+        def quit
+          @connection&.quit
+        rescue ::Protocol::SMTP::Error, IOError, SystemCallError => error
+          Console.debug(self) {"Connection ended before QUIT: #{error.message}"}
+
+          @peer&.close
+        end
 
         def start
           @peer = @endpoint.connect

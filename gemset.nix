@@ -190,8 +190,8 @@
     platforms = [];
     source = {
       fetchSubmodules = false;
-      rev = "94c14a7b0d625bcc960d188e0854652249e5b682";
-      sha256 = "0vfsyma2pihi9nx48zf76gfipdi2w85w5vdfsgydy027dpipdng8";
+      rev = "0c209c02723dc97843387e9c61776014d6a9fbbe";
+      sha256 = "1n5qza0cp39h2jvbz6xn428nv6s4gxaynya67ih67svqjn2i9ksz";
       type = "git";
       url = "https://github.com/n-at-han-k/protocol-smtp";
     };

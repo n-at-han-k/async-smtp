@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/n-at-han-k/protocol-smtp
-  revision: 94c14a7b0d625bcc960d188e0854652249e5b682
+  revision: 0c209c02723dc97843387e9c61776014d6a9fbbe
   specs:
     protocol-smtp (0.1.0)
 

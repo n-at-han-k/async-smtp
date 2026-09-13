@@ -55,8 +55,8 @@ module Async
       def as_json(...)
         {
           endpoint: @endpoint.to_s,
-          domain: @domain,
-          secure: !@ssl_context.nil?,
+          domain:   @domain,
+          secure:   !@ssl_context.nil?,
         }
       end
 
@@ -92,8 +92,8 @@ module Async
         def connection(peer, address)
           ::Protocol::SMTP::Server.new(
             ::IO::Stream::Buffered.wrap(peer),
-            domain: @domain,
-            peer: peer_address(address),
+            domain:   @domain,
+            peer:     peer_address(address),
             starttls: starttls(peer),
             **@options,
           )

@@ -35,7 +35,7 @@ describe Async::SMTP::Server do
     serve do |client|
       reply = client.deliver(
         from: "me@example.test",
-        to: "you@example.test",
+        to:   "you@example.test",
         body: "Subject: Hello\r\n\r\nBody.\r\n",
       )
 
@@ -124,7 +124,7 @@ describe Async::SMTP::Server do
 
         reply = client.deliver(
           from: "me@example.test",
-          to: "you@example.test",
+          to:   "you@example.test",
           body: "Subject: Secret\r\n\r\nBody.\r\n",
         )
 
