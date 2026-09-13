@@ -22,8 +22,14 @@ end
 ```
 
 The handler is called with a `Protocol::SMTP::Message` and answers with a
-`Protocol::SMTP::Reply`. One task per connection: a slow handler holds up its
-own client and nobody else's.
+`Protocol::SMTP::Reply`, or a `String` for the text of a `250`. Answering with
+nothing, or raising, gets the client a `451` and the failure a log entry — the
+connection survives either way. One task per connection: a slow handler holds
+up its own client and nobody else's.
+
+protocol-smtp owns the conversation; what lives here is the socket, the task,
+the loop that drives `read_message`, the application at the end of it, and
+closing the socket afterwards.
 
 ## Client
 

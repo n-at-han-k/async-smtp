@@ -1,37 +1,17 @@
 # frozen_string_literal: true
 
 require "async/smtp"
-require "async/smtp/certificate"
+require "async/smtp/session"
 
 describe Async::SMTP::Server do
   let(:messages) {[]}
   let(:handler) {proc {|message| messages << message; Protocol::SMTP::Reply.ok("queued")}}
-  let(:server_options) {{}}
-  let(:client_options) {{}}
 
-  # Bind an ephemeral port, serve it for the duration of the block, and give
-  # the block a client connected to it.
-  def serve(&block)
-    Sync do |task|
-      bound = IO::Endpoint.tcp("127.0.0.1", 0).bound
-
-      begin
-        endpoint = bound.local_address_endpoint
-        server = subject.for(endpoint, domain: "mail.example.test", **server_options, &handler)
-
-        server_task = task.async do
-          bound.accept {|peer, address| server.accept(peer, address)}
-        end
-
-        Async::SMTP::Client.open(endpoint, domain: "client.example.test", **client_options, &block)
-      ensure
-        server_task&.stop
-        bound.close
-      end
-    end
+  def serve(**options, &block)
+    Async::SMTP::Session.serve(handler, **options, &block)
   end
 
-  it "delivers a message end to end" do
+  it "drives the conversation and hands each message to the handler" do
     serve do |client|
       reply = client.deliver(
         from: "me@example.test",
@@ -47,111 +27,63 @@ describe Async::SMTP::Server do
     expect(messages.first.from).to be == "me@example.test"
     expect(messages.first.to).to be == ["you@example.test"]
     expect(messages.first.subject).to be == "Hello"
-    expect(messages.first.helo).to be == "client.example.test"
-    expect(messages.first.peer).to be == "127.0.0.1"
-    expect(messages.first).not.to be(:secure?)
   end
 
-  it "reuses one connection for several transactions" do
-    serve do |client|
-      2.times do |index|
-        client.deliver(from: "me@example.test", to: "you@example.test", body: "Subject: #{index}\r\n\r\n.\r\n")
-      end
+  with "a handler that refuses the message" do
+    let(:handler) {proc {Protocol::SMTP::Reply.rejected("No thanks")}}
 
-      expect(client.extensions.keys).to be(:include?, "SIZE")
-    end
-
-    expect(messages.map(&:subject)).to be == ["0", "1"]
-    # The dot the client stuffed came back off:
-    expect(messages.first.body).to be == ".\r\n"
-  end
-
-  it "reports what the handler refused" do
-    handler = proc {Protocol::SMTP::Reply.rejected("No thanks")}
-    server_options.freeze
-
-    Sync do |task|
-      bound = IO::Endpoint.tcp("127.0.0.1", 0).bound
-
-      begin
-        endpoint = bound.local_address_endpoint
-        server = subject.for(endpoint, &handler)
-        server_task = task.async {bound.accept {|peer, address| server.accept(peer, address)}}
-
-        Async::SMTP::Client.open(endpoint) do |client|
-          expect do
-            client.deliver(from: "me@example.test", to: "you@example.test", body: "Hi\r\n")
-          end.to raise_exception(Protocol::SMTP::ReplyError) do |error|
-            expect(error.reply.code).to be == 550
-          end
-        end
-      ensure
-        server_task&.stop
-        bound.close
-      end
-    end
-  end
-
-  with "a message over the limit" do
-    let(:server_options) {{maximum_message_size: 64}}
-
-    it "refuses it at the terminating dot" do
+    it "sends that refusal" do
       serve do |client|
         expect do
-          client.deliver(from: "me@example.test", to: "you@example.test", body: "#{"x" * 200}\r\n")
+          client.deliver(from: "me@example.test", to: "you@example.test", body: "Hi\r\n")
         end.to raise_exception(Protocol::SMTP::ReplyError) do |error|
-          expect(error.reply.code).to be == 552
+          expect(error.reply.code).to be == 550
         end
       end
-
-      expect(messages).to be(:empty?)
-    end
-
-    it "advertises the limit, so a client can give up first" do
-      serve do |client|
-        expect(client.connection.maximum_message_size).to be == 64
-      end
     end
   end
 
-  with "STARTTLS" do
-    let(:server_options) {{ssl_context: Async::SMTP::Certificate.server_context}}
-    let(:client_options) {{ssl_context: Async::SMTP::Certificate.client_context}}
+  with "a handler that answers with a string" do
+    let(:handler) {proc {"queued as 42"}}
 
-    it "upgrades the connection and delivers over it" do
+    it "makes it the text of a 250" do
       serve do |client|
-        expect(client).to be(:secure?)
-
-        reply = client.deliver(
-          from: "me@example.test",
-          to:   "you@example.test",
-          body: "Subject: Secret\r\n\r\nBody.\r\n",
-        )
+        reply = client.deliver(from: "me@example.test", to: "you@example.test", body: "Hi\r\n")
 
         expect(reply.code).to be == 250
-
-        # The extension list is the one from after the upgrade, which no
-        # longer offers STARTTLS:
-        expect(client.extensions).not.to be(:include?, "STARTTLS")
+        expect(reply.text).to be == "queued as 42"
       end
-
-      expect(messages.first.subject).to be == "Secret"
-      expect(messages.first).to be(:secure?)
     end
   end
 
-  with "a client that refuses to upgrade" do
-    let(:server_options) {{ssl_context: Async::SMTP::Certificate.server_context}}
-    let(:client_options) {{starttls: false}}
+  with "a handler that answers with nothing" do
+    let(:handler) {proc {nil}}
 
-    it "carries on in the clear" do
+    it "says so with a 4xx, because the client may try again" do
       serve do |client|
-        expect(client).not.to be(:secure?)
-        expect(client.extensions).to be(:include?, "STARTTLS")
-        expect(client.deliver(from: "me@example.test", to: "you@example.test", body: "Hi\r\n").code).to be == 250
+        expect do
+          client.deliver(from: "me@example.test", to: "you@example.test", body: "Hi\r\n")
+        end.to raise_exception(Protocol::SMTP::ReplyError) do |error|
+          expect(error.reply.code).to be == 451
+        end
       end
+    end
+  end
 
-      expect(messages.first).not.to be(:secure?)
+  with "a handler that raises" do
+    let(:handler) {proc {raise "boom"}}
+
+    it "keeps the connection and answers 451, rather than dropping the client" do
+      serve do |client|
+        expect do
+          client.deliver(from: "me@example.test", to: "you@example.test", body: "Hi\r\n")
+        end.to raise_exception(Protocol::SMTP::ReplyError) do |error|
+          expect(error.reply.code).to be == 451
+        end
+
+        # The conversation survived the failure:
+        expect(client.connection.noop.code).to be == 250
+      end
     end
   end
 

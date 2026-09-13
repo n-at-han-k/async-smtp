@@ -10,7 +10,9 @@ module Async
   module SMTP
     # An SMTP server that accepts connections on an endpoint and hands each
     # complete message to an application handler — async-http's Server, for a
-    # protocol that isn't HTTP.
+    # protocol that isn't HTTP. The conversation itself belongs to
+    # protocol-smtp; what lives here is the socket, the task it runs in, the
+    # loop that drives it, and the application at the end of that loop.
     #
     #   endpoint = Async::SMTP::Endpoint.for("127.0.0.1", 1025)
     #   Async::SMTP::Server.for(endpoint) { |message| Protocol::SMTP::Reply.ok }.run
@@ -69,12 +71,20 @@ module Async
       # @parameter peer [IO] The connected peer.
       # @parameter address [Addrinfo] Where it connected from.
       def accept(peer, address, task: Task.current)
-        connection(peer, address).each do |message|
-          @app.call(message)
+        connection = connection(peer, address)
+
+        Console.debug(self) {"Incoming connection from #{address.inspect}."}
+
+        connection.write_greeting
+
+        while message = connection.read_message
+          connection.write_reply(reply_for(message))
         end
       rescue ::Protocol::SMTP::Error, IOError, SystemCallError => error
         # The peer's problem, not ours: log it and let this task end.
         Console.debug(self) {"Connection from #{address.inspect} ended: #{error.message}"}
+      ensure
+        connection&.close
       end
 
       # @returns [Async::Task] The task the server is running in.
@@ -88,6 +98,26 @@ module Async
       end
 
       private
+
+        # The one reply in the conversation that is the application's. A Reply
+        # is written as it stands; a String is the text of a 250, because
+        # "queued" is the whole of what most handlers want to say. Anything
+        # else — nothing at all, or an exception — is this server's problem
+        # rather than the client's, so it gets a 4xx and the client may try
+        # again later.
+        def reply_for(message)
+          @app.call(message).then do |reply|
+            case reply
+            when ::Protocol::SMTP::Reply then reply
+            when nil then ::Protocol::SMTP::Reply.new(451, "Handler did not answer")
+            else ::Protocol::SMTP::Reply.ok(reply.to_s)
+            end
+          end
+        rescue => error
+          Console.error(self, "Handler failed!", error)
+
+          ::Protocol::SMTP::Reply.new(451, "Internal error")
+        end
 
         def connection(peer, address)
           ::Protocol::SMTP::Server.new(

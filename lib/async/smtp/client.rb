@@ -106,24 +106,30 @@ module Async
       end
 
       # Say QUIT, if there is anyone to say it to, and close the socket.
+      # protocol-smtp never closes a stream it did not open, so that half is
+      # here too.
       def close
         quit
-
-        @connection = nil
-        @peer = nil
+        disconnect
       end
 
       private
 
-        # Protocol::SMTP::Client#quit closes the stream once the 221 is in, so
-        # the socket is only ours to close when the server did not get that
-        # far.
         def quit
           @connection&.quit
         rescue ::Protocol::SMTP::Error, IOError, SystemCallError => error
+          # The server hung up before its 221; there is nothing left to say,
+          # but the socket is still ours to close.
           Console.debug(self) {"Connection ended before QUIT: #{error.message}"}
+        end
 
-          @peer&.close
+        def disconnect
+          @connection&.close
+        rescue IOError, SystemCallError => error
+          Console.debug(self) {"Connection closed abruptly: #{error.message}"}
+        ensure
+          @connection = nil
+          @peer = nil
         end
 
         def start
