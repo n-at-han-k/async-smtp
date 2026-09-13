@@ -21,7 +21,7 @@
     version = "2.45.1";
   };
   async-smtp = {
-    dependencies = ["async" "io-endpoint" "io-stream" "protocol-smtp"];
+    dependencies = ["async" "gem_kit" "io-endpoint" "io-stream" "protocol-smtp"];
     groups = ["default"];
     platforms = [];
     source = {
@@ -71,6 +71,27 @@
       type = "gem";
     };
     version = "1.0.1";
+  };
+  gem_kit = {
+    groups = ["default" "development"];
+    platforms = [];
+    source = {
+      remotes = ["https://rubygems.org"];
+      sha256 = "0dx9w041lqzr4jd0m9as0v5v6n3fj2hcg74p2gyswr2y2a6zc5v9";
+      type = "gem";
+    };
+    version = "0.2.0";
+  };
+  gem_kit-release = {
+    dependencies = ["gem_kit" "thor"];
+    groups = ["development"];
+    platforms = [];
+    source = {
+      remotes = ["https://rubygems.org"];
+      sha256 = "1cnl3p4y9jfag8q908ih28q3hll21b3ban5j004cra7l58hg3rrq";
+      type = "gem";
+    };
+    version = "0.3.2";
   };
   io-endpoint = {
     dependencies = ["openssl"];
@@ -186,12 +207,13 @@
     version = "1.9.0";
   };
   protocol-smtp = {
+    dependencies = ["gem_kit"];
     groups = ["default"];
     platforms = [];
     source = {
       fetchSubmodules = false;
-      rev = "c7a4a0f211cb58e6be95cc7394571d936c770101";
-      sha256 = "07ap2ymzlm8snpng5sxadgs5lald4yfs7nl1znk4h8f6civrbcmc";
+      rev = "e864fea5a1e43576a5b24ec9b48677f36f235606";
+      sha256 = "1cqqbn6l6axlqdhcqk88k9m3qbri7qg05a00l76gjsnn4rh20dam";
       type = "git";
       url = "https://github.com/n-at-han-k/protocol-smtp";
     };
@@ -278,6 +300,16 @@
       type = "gem";
     };
     version = "1.0.0";
+  };
+  thor = {
+    groups = ["default" "development"];
+    platforms = [];
+    source = {
+      remotes = ["https://rubygems.org"];
+      sha256 = "0wsy88vg2mazl039392hqrcwvs5nb9kq8jhhrrclir2px1gybag3";
+      type = "gem";
+    };
+    version = "1.5.0";
   };
   unicode-display_width = {
     dependencies = ["unicode-emoji"];
