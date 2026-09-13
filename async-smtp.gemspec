@@ -31,6 +31,9 @@ Gem::Specification.new do |spec|
   spec.files = Dir.glob(["lib/**/*.rb", "*.md", "LICENSE"], base: __dir__)
   spec.require_paths = ["lib"]
 
+  # The deprecation DSL. Tiny and dependency-free on purpose: declaring a
+  # deprecation is runtime work, and the toolchain that enforces the deadline
+  # (gem_kit-release, below) is not.
   spec.add_dependency "gem_kit", "~> 0.2"
   spec.add_dependency "async", ">= 2.0"
   spec.add_dependency "io-endpoint", "~> 0.18"
@@ -41,5 +44,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rake", "~> 13.0"
   spec.add_development_dependency "rubocop", "~> 1.60"
   spec.add_development_dependency "scampi", "~> 1.0"
+  # The release toolchain: `gem kit bump|changelog|deprecations|release|tag`.
   spec.add_development_dependency "gem_kit-release", "~> 0.3"
 end

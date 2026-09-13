@@ -121,6 +121,23 @@ bin/test                          # everything
 bin/test lib/async/smtp/client.rb # one file
 ```
 
+## Releasing
+
+Inside the devshell, and via `bundle exec` so the library actually loads and
+its deprecations get scanned:
+
+``` shell
+bin/test                              # 1. green suite
+bundle exec gem kit bump minor        # 2. bump the version
+bundle exec gem kit changelog --write # 3. write the entry
+git commit -am "Release ..."          # 4. the bump and the entry, one commit
+bundle exec gem kit release           # 5. gates, build, push
+bundle exec gem kit tag --push        # 6. tag it
+```
+
+Steps 2 and 5 are gates: a deprecation due at the new version, or a missing
+changelog section, stops them.
+
 ## License
 
 MIT.

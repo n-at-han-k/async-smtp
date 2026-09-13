@@ -207,6 +207,7 @@
     version = "1.9.0";
   };
   protocol-smtp = {
+    dependencies = ["gem_kit"];
     groups = ["default"];
     platforms = [];
     source = {
